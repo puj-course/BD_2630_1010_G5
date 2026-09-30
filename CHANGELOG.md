@@ -52,7 +52,6 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 |Cierre del ERD y supuestos |Andrés Gómez |feature/modelo-documental |Modelo entidad-relación y supuestos de diseño |
 |Transformación al modelo lógico y diccionario de datos |Andrés Gómez |feature/modelo-documental |Documentado en docs/documento_tecnico.md |
 |Evaluación crítica y matriz de trazabilidad |Andrés Gómez |feature/modelo-documental |Documentado en docs/documento_tecnico.md |
-|Álgebra relacional |Andrés Gómez |feature/modelo-documental |docs/algebra_relacional.md |
 
 ### Cambios principales
 - Documentación técnica del modelo inicial publicada en docs/.
@@ -139,7 +138,7 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 
 | Tarea | Responsable(s) | Rama utilizada | Descripción |
 |------|------|------|------|
-|Álgebra relacional |Andrés Gómez |feature/consultas-pruebas |Traducción (σ, π, ⋈, ρ, entre otros) de al menos 4 consultas de la Sección 8.1.9 (8.1.7). docs/algebra_relacional.md |
+|Álgebra relacional |Andrés Gómez |feature/consultas-pruebas |Traducción (σ, π, ⋈, ρ, entre otros) de al menos 4 consultas de la Sección 8.1.9 (8.1.7). sql/algebra_relacional.md |
 |Consultas SQL |Andrés Gómez |feature/consultas-pruebas |15 consultas: JOIN, subconsultas correlacionadas y no correlacionadas, GROUP BY/HAVING, agregaciones y reutilización de al menos una vista (8.1.9). sql/06_consultas.sql |
 |Evaluación crítica del modelo inicial |Andrés Gómez |feature/consultas-pruebas |Problemas identificados, ajustes propuestos con justificación y bosquejo del ERD ampliado con nuevas entidades anticipadas (8.1.8). docs/evaluacion_critica.md |
 
