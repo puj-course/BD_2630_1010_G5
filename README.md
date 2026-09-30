@@ -12,6 +12,45 @@ Lee los tres documentos antes de empezar a trabajar.
 
 ---
 
+## Información del equipo
+
+- Integrante: Andrés Gómez
+- Curso: Bases de Datos
+- Entregas: 1 — Modelo relacional, SQL e integridad sobre el modelo inicial;
+  2 — Consultas avanzadas, perfección del modelo y roles
+
+---
+
+## Alcance de la Entrega 1
+
+La Entrega 1 se implementa sobre el modelo genérico inicial de cinco entidades:
+
+1. `EDICION_MUNDIAL`
+2. `ESTADIO`
+3. `SELECCION`
+4. `PARTIDO`
+5. `PARTICIPACION_PARTIDO`
+
+Se agregan únicamente ajustes menores necesarios para cumplir las consultas y reglas
+solicitadas: asistencia registrada, estado del partido, resultado de cada participación y
+claves compuestas de consistencia entre edición y sus entidades dependientes. Jugadores,
+árbitros, grupos, estadísticas detalladas, boletería, prensa e incidencias se presentan como
+evolución propuesta en la evaluación crítica (Sección 8.1.8), y se incorporan formalmente
+en la Entrega 2.
+
+---
+
+## Alcance de la Entrega 2
+
+A partir de la evaluación crítica y de la retroalimentación recibida en la sustentación, que no tuvimos de
+la Entrega 1, se expande el modelo incorporando las entidades adicionales pertinentes
+(jugadores, cuerpo técnico, árbitros, estadísticas, grupos, fases eliminatorias, boletería,
+medios, incidencias, entre otras), normalizando hasta Tercera Forma Normal (3FN) y
+definiendo roles con restricciones de acceso diferenciadas: Administrador del Torneo,
+Analista Deportivo y Auditor/Consulta.
+
+---
+
 ## Contexto académico
 
 El proyecto se basa en el enunciado "Sistema de Información para la Gestión Integral de la Copa Mundial de la FIFA" (Ing. Luis Gabriel Moreno Sandoval, PhD. — Bases de Datos, PUJ). El trabajo se organiza según el siguiente cronograma académico del curso:
@@ -164,6 +203,22 @@ BD_PROYECTO/
 ```
 
 El detalle exacto de qué archivo va dentro de cada subcarpeta, semana a semana, está en README_CRONOGRAMA.md. Esa estructura es la que se debe seguir de forma precisa.
+
+---
+
+## Cronograma de avances
+
+| Semana | Hito | Actividad | Responsable | Evidencia |
+|---|---|---|---|---|
+| 1 | Alcance y supuestos | Revisar enunciado y rúbrica; redactar descripción del problema, alcance y supuestos de modelado | Andrés Gómez | `README.md`, `CHANGELOG.md` |
+| 2 | Modelo ER y lógico | Diagramar el ERD y transformarlo a modelo lógico; construir el diccionario de datos | Andrés Gómez | `docs/documento_tecnico.md` |
+| 3 | Integridad y reglas de negocio | Implementar DDL, PK/FK con `ON DELETE`/`ON UPDATE` justificado, `CHECK`/`UNIQUE`, índices y restricciones de negocio adicionales | Andrés Gómez | `sql/01_ddl.sql` |
+| 4 | Datos y vistas | Cargar dataset sintético (mínimo 100 registros por tabla principal) y crear entre 4 y 5 vistas justificadas | Andrés Gómez | `sql/02_datos_prueba.sql`, `sql/03_vistas.sql` |
+| 5 | DML y privilegios | Probar ciclo de vida de un partido, operaciones inválidas, `ON DELETE` y roles con `GRANT`/`REVOKE` | Andrés Gómez | `sql/04_dml_pruebas.sql`, `sql/05_privilegios.sql` |
+| 6 | Álgebra, consultas y evaluación crítica | Traducir consultas a álgebra relacional, resolver las quince consultas SQL y redactar la evaluación crítica del modelo inicial | Andrés Gómez | `sql/06_consultas.sql`, `docs/algebra_relacional.md`, `docs/evaluacion_critica.md` |
+| 7 | Revisión y sustentación (Entrega 1) | Ejecutar todo en el servidor, capturar evidencias, integrar ramas a `main` y sustentar de forma individual | Andrés Gómez | `sql/07_verificacion.sql`, capturas de resultados |
+| 8 | Expansión del modelo (Entrega 2) | Incorporar nuevas entidades, avanzar al modelo físico normalizado (3FN) y construir consultas avanzadas | Andrés Gómez | `docs/entrega2/modelo_fisico.md`, `sql/entrega2/08_ddl_ampliado.sql`, `sql/entrega2/09_consultas_avanzadas.sql` |
+| 9 | Roles y pruebas (Entrega 2) | Definir roles diferenciados (Administrador, Analista Deportivo, Auditor) y ejecutar casos de prueba válidos y fallidos | Andrés Gómez | `sql/entrega2/10_roles.sql`, `sql/entrega2/11_pruebas.sql` |
 
 ---
 
