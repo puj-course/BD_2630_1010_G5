@@ -364,6 +364,4 @@ CREATE INDEX idx_e2_inscripcion_seleccion
 CREATE INDEX idx_e2_stats_jugador
     ON estadistica_jugador_e2 (id_jugador);
 
--- Nota: sin trigger de auditoria (tema no visto). La trazabilidad se
--- demuestra insertando en AUDITORIA_E2 junto a cada INCIDENCIA_E2 y
--- verificando con LEFT JOIN en 14_verificacion_entrega2.sql.
+
