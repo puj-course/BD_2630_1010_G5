@@ -1,4 +1,4 @@
-# Modelo Lógico Ampliado
+# Modelo Lógico 
 
 ## 1. Introducción
 
