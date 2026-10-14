@@ -1,258 +1,277 @@
--- Entrega 1 - Las quince consultas solicitadas
+-- Entrega 1 - Las quince consultas
 
-SET DEFINE OFF;
+-- ==============================================================================
+-- Consulta 1 <Top 5 selecciones con mas goles marcados>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 1. Top 5 selecciones con mas goles en 2026.
-------------------------------------------------------------------------
+SELECT *
+FROM (
+    SELECT s.pais,
+           SUM(pp.goles_marcados) AS goles_totales
+    FROM MORENOLUIS.FIFA_SELECCION s
+    JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO pp
+        ON s.id_seleccion = pp.id_seleccion
+    GROUP BY s.pais
+    ORDER BY goles_totales DESC
+)
+WHERE ROWNUM <= 5;
 
-SELECT anio, id_seleccion, pais, confederacion, goles_marcados
-  FROM vw_goleadores_sel
- WHERE anio = 2026
- ORDER BY goles_marcados DESC, pais
- FETCH FIRST 5 ROWS ONLY;
+-- ==============================================================================
+-- Consulta 2 <Porcentaje de ocupacion estimado por estadio>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 2. Porcentaje de ocupacion por estadio (reutiliza la vista).
-------------------------------------------------------------------------
+SELECT nombre AS estadio, ciudad, capacidad,
+       COUNT(id_partido) partidos_jugados,
+       ROUND(AVG(asistencia_registrada/capacidad*100),2) ocupacion_pct
+FROM MORENOLUIS.FIFA_ESTADIO
+JOIN MORENOLUIS.FIFA_PARTIDO USING (id_estadio)
+GROUP BY nombre, ciudad, capacidad
+ORDER BY ocupacion_pct DESC;
 
-SELECT anio, id_estadio, estadio, ciudad, capacidad,
-       partidos_albergados, asistencia_total, ocupacion_promedio_pct
-  FROM vw_ocupacion_estadio
- WHERE anio = 2026
- ORDER BY ocupacion_promedio_pct DESC, estadio;
+-- ==============================================================================
+-- Consulta 3 <Selecciones con mayor diferencia de gol>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 3. Selecciones con mayor diferencia de gol.
-------------------------------------------------------------------------
+SELECT s.pais,
+       SUM(pp.goles_marcados) AS goles_favor,
+       SUM(
+           (
+               SELECT pp2.goles_marcados
+               FROM MORENOLUIS.FIFA_PARTICIPACION_PARTIDO pp2
+               WHERE pp2.id_partido = pp.id_partido
+                 AND pp2.id_seleccion <> pp.id_seleccion
+           )
+       ) AS goles_contra,
+       SUM(pp.goles_marcados) -
+       SUM(
+           (
+               SELECT pp2.goles_marcados
+               FROM MORENOLUIS.FIFA_PARTICIPACION_PARTIDO pp2
+               WHERE pp2.id_partido = pp.id_partido
+                 AND pp2.id_seleccion <> pp.id_seleccion
+           )
+       ) AS diferencia_gol
+FROM MORENOLUIS.FIFA_SELECCION s
+JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO pp
+    ON s.id_seleccion = pp.id_seleccion
+GROUP BY s.pais
+ORDER BY diferencia_gol DESC;
 
-SELECT t.anio, t.id_seleccion, t.pais, t.goles_favor,
-       t.goles_contra, t.diferencia_goles
-  FROM vw_tabla_posiciones t
- WHERE t.anio = 2026
-   AND t.diferencia_goles = (
-        SELECT MAX(t2.diferencia_goles)
-          FROM vw_tabla_posiciones t2
-         WHERE t2.anio = 2026
-       )
- ORDER BY t.pais;
+-- ==============================================================================
+-- Consulta 4 <Partidos jugados por fase>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 4. Cantidad de partidos por fase.
-------------------------------------------------------------------------
+SELECT fase, COUNT(id_partido) num_partidos
+FROM MORENOLUIS.FIFA_PARTIDO
+GROUP BY fase
+ORDER BY num_partidos DESC;
 
-SELECT e.anio, p.fase, COUNT(*) AS cantidad_partidos
-  FROM partido p
-  JOIN edicion_mundial e
-    ON e.id_edicion = p.id_edicion
- WHERE e.anio = 2026
- GROUP BY e.anio, p.fase
- ORDER BY
-       CASE p.fase
-           WHEN 'FASE DE GRUPOS' THEN 1
-           WHEN 'DIECISEISAVOS' THEN 2
-           WHEN 'OCTAVOS' THEN 3
-           WHEN 'CUARTOS' THEN 4
-           WHEN 'SEMIFINALES' THEN 5
-           WHEN 'TERCER PUESTO' THEN 6
-           WHEN 'FINAL' THEN 7
-       END;
+-- ==============================================================================
+-- Consulta 5 <Estadio(s) con mayor cantidad de partidos por edicion>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 5. Por cada edicion, estadio(s) con mayor cantidad de partidos.
-------------------------------------------------------------------------
+SELECT E.ID_EDICION, S.NOMBRE ESTADIO, COUNT(P.ID_PARTIDO) N_PARTIDOS
+FROM MORENOLUIS.FIFA_EDICION_MUNDIAL E
+JOIN MORENOLUIS.FIFA_ESTADIO S
+    ON E.ID_EDICION = S.ID_EDICION
+JOIN MORENOLUIS.FIFA_PARTIDO P
+    ON P.ID_ESTADIO = S.ID_ESTADIO
+GROUP BY E.ID_EDICION, S.ID_ESTADIO, S.NOMBRE
+HAVING COUNT(P.ID_PARTIDO) = (SELECT MAX(COUNT(A.ID_PARTIDO))
+                              FROM MORENOLUIS.FIFA_PARTIDO A
+                              JOIN MORENOLUIS.FIFA_ESTADIO B
+                                  ON A.ID_ESTADIO = B.ID_ESTADIO
+                              WHERE E.ID_EDICION = B.ID_EDICION
+                              GROUP BY A.ID_ESTADIO);
 
-SELECT c.anio, c.id_estadio, c.estadio, c.partidos_albergados
-  FROM (
-        SELECT e.anio, es.id_estadio, es.nombre AS estadio,
-               COUNT(p.id_partido) AS partidos_albergados
-          FROM edicion_mundial e
-          JOIN estadio es
-            ON es.id_edicion = e.id_edicion
-          LEFT JOIN partido p
-            ON p.id_estadio = es.id_estadio
-         GROUP BY e.anio, es.id_estadio, es.nombre
-       ) c
- WHERE c.partidos_albergados = (
-        SELECT MAX(c2.partidos_albergados)
-          FROM (
-                SELECT e2.anio, es2.id_estadio,
-                       COUNT(p2.id_partido) AS partidos_albergados
-                  FROM edicion_mundial e2
-                  JOIN estadio es2
-                    ON es2.id_edicion = e2.id_edicion
-                  LEFT JOIN partido p2
-                    ON p2.id_estadio = es2.id_estadio
-                 GROUP BY e2.anio, es2.id_estadio
-               ) c2
-         WHERE c2.anio = c.anio
-       )
- ORDER BY c.anio, c.estadio;
+-- ==============================================================================
+-- Consulta 6 <Partidos con patrones atipicos: marcador alto (>5) o sin goles>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 6. Patrones atipicos: 0-0 o al menos ocho goles.
-------------------------------------------------------------------------
+SELECT P.id_partido, P.id_edicion, P.fase,
+       SUM(PP.goles_marcados) goles_totales,
+       CASE WHEN SUM(PP.goles_marcados) > 5 THEN 'MARCADOR ALTO'
+            WHEN SUM(PP.goles_marcados) = 0 THEN 'SIN GOLES'
+       END patron
+FROM MORENOLUIS.FIFA_PARTIDO P
+JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PP
+    ON P.id_partido = PP.id_partido
+GROUP BY P.id_partido, P.id_edicion, P.fase
+HAVING SUM(PP.goles_marcados) = 0 OR SUM(PP.goles_marcados) > 5
+ORDER BY goles_totales DESC;
 
-SELECT id_partido, anio, fase, estadio, seleccion_local,
-       seleccion_visitante, goles_local, goles_visitante,
-       goles_totales, asistencia_registrada
-  FROM vw_partidos_atipicos
- WHERE anio = 2026
- ORDER BY goles_totales DESC, id_partido;
+-- ==============================================================================
+-- Consulta 7 <Selecciones invictas>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 7. Selecciones invictas.
-------------------------------------------------------------------------
+SELECT s.pais
+FROM MORENOLUIS.FIFA_SELECCION S
+WHERE NOT EXISTS
+ (SELECT 1
+  FROM MORENOLUIS.FIFA_PARTIDO P
+  JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PP ON P.id_partido = PP.id_partido
+  WHERE PP.id_seleccion = S.id_seleccion
+  AND (
+      (PP.condicion = 'local'
+      AND PP.goles_marcados <
+      (SELECT MAX(PPV.goles_marcados)
+       FROM MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PPV
+       WHERE PPV.id_partido = P.id_partido AND PPV.condicion = 'visitante'))
+      OR
+      (PP.condicion = 'visitante'
+      AND PP.goles_marcados <
+          (SELECT MAX(PPL.goles_marcados)
+           FROM MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PPL
+           WHERE PPL.id_partido = P.id_partido AND PPL.condicion = 'local'))
+     )
+  );
 
-SELECT e.anio, s.id_seleccion, s.pais, s.confederacion
-  FROM seleccion s
-  JOIN edicion_mundial e
-    ON e.id_edicion = s.id_edicion
- WHERE e.anio = 2026
-   AND EXISTS (
-        SELECT 1
-          FROM participacion_partido pp
-          JOIN partido p
-            ON p.id_partido = pp.id_partido
-         WHERE pp.id_seleccion = s.id_seleccion
-           AND p.estado_partido = 'FINALIZADO'
-       )
-   AND NOT EXISTS (
-        SELECT 1
-          FROM participacion_partido pp
-          JOIN partido p
-            ON p.id_partido = pp.id_partido
-         WHERE pp.id_seleccion = s.id_seleccion
-           AND p.estado_partido = 'FINALIZADO'
-           AND pp.resultado = 'PERDIO'
-       )
- ORDER BY s.pais;
+-- ==============================================================================
+-- Consulta 8 <Estadios sobre el promedio de ocupacion>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 8. Estadios por encima del promedio de ocupacion.
-------------------------------------------------------------------------
+SELECT nombre AS estadio, ciudad,
+       ROUND(AVG(asistencia_registrada/capacidad*100),2) ocupacion_pct
+FROM MORENOLUIS.FIFA_ESTADIO E
+JOIN MORENOLUIS.FIFA_PARTIDO P ON E.id_estadio = P.id_estadio
+GROUP BY E.nombre, E.ciudad
+HAVING ROUND(AVG(asistencia_registrada/capacidad*100),2) > (
+    SELECT ROUND(AVG(asistencia_registrada/capacidad*100),2)
+    FROM MORENOLUIS.FIFA_ESTADIO E1
+    JOIN MORENOLUIS.FIFA_PARTIDO P1 ON E1.id_estadio = P1.id_estadio)
+ORDER BY ocupacion_pct DESC;
 
-SELECT v.anio, v.id_estadio, v.estadio, v.ciudad,
-       v.ocupacion_promedio_pct
-  FROM vw_ocupacion_estadio v
- WHERE v.anio = 2026
-   AND v.ocupacion_promedio_pct > (
-        SELECT AVG(v2.ocupacion_promedio_pct)
-          FROM vw_ocupacion_estadio v2
-         WHERE v2.anio = v.anio
-       )
- ORDER BY v.ocupacion_promedio_pct DESC, v.estadio;
+-- ==============================================================================
+-- Consulta 9 <Partido con mayor marcador combinado por estadio>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 9. Partido(s) con mayor marcador combinado por estadio.
-------------------------------------------------------------------------
+SELECT E.NOMBRE, A.ID_PARTIDO, A.FASE, SUM(P.GOLES_MARCADOS) GOLES_TOTALES
+FROM MORENOLUIS.FIFA_PARTIDO A
+JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO P
+    ON A.ID_PARTIDO = P.ID_PARTIDO
+JOIN MORENOLUIS.FIFA_ESTADIO E
+    ON A.ID_ESTADIO = E.ID_ESTADIO
+GROUP BY A.ID_PARTIDO, E.NOMBRE, A.ID_ESTADIO, A.FASE
+HAVING SUM(P.GOLES_MARCADOS) = (SELECT MAX(SUM(Y.GOLES_MARCADOS))
+                                FROM MORENOLUIS.FIFA_PARTIDO Z
+                                JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO Y
+                                    ON Z.ID_PARTIDO = Y.ID_PARTIDO
+                                WHERE Z.ID_ESTADIO = A.ID_ESTADIO
+                                GROUP BY Z.ID_PARTIDO)
+ORDER BY NOMBRE;
 
-SELECT v.id_estadio, v.estadio, v.anio, v.id_partido, v.fase,
-       v.seleccion_local, v.seleccion_visitante,
-       v.goles_local, v.goles_visitante,
-       v.goles_local + v.goles_visitante AS goles_totales
-  FROM vw_marcador_partidos v
- WHERE v.anio = 2026
-   AND v.estado_partido = 'FINALIZADO'
-   AND (v.goles_local + v.goles_visitante) = (
-        SELECT MAX(v2.goles_local + v2.goles_visitante)
-          FROM vw_marcador_partidos v2
-         WHERE v2.anio = 2026
-           AND v2.estado_partido = 'FINALIZADO'
-           AND v2.id_estadio = v.id_estadio
-       )
- ORDER BY v.estadio, v.id_partido;
+-- ==============================================================================
+-- Consulta 10 <Selecciones con condicion exclusiva>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 10. Selecciones que jugaron todos sus partidos como LOCAL, o ninguno.
-------------------------------------------------------------------------
+SELECT S.pais,
+       SUM(CASE WHEN PP.condicion = 'local' THEN 1 ELSE 0 END) partidos_local,
+       SUM(CASE WHEN PP.condicion = 'visitante' THEN 1 ELSE 0 END) partidos_visitante,
+       COUNT(PP.id_participacion) total_partidos
+FROM MORENOLUIS.FIFA_SELECCION S
+JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PP
+    ON S.id_seleccion = PP.id_seleccion
+GROUP BY S.pais
+HAVING SUM(CASE WHEN PP.condicion = 'local' THEN 1 ELSE 0 END) = 0
+    OR SUM(CASE WHEN PP.condicion = 'visitante' THEN 1 ELSE 0 END) = 0
+ORDER BY S.pais;
 
-SELECT e.anio, s.id_seleccion, s.pais,
-       COUNT(*) AS partidos_jugados,
-       SUM(CASE WHEN pp.condicion = 'LOCAL' THEN 1 ELSE 0 END) AS partidos_como_local
-  FROM seleccion s
-  JOIN edicion_mundial e
-    ON e.id_edicion = s.id_edicion
-  JOIN participacion_partido pp
-    ON pp.id_seleccion = s.id_seleccion
-  JOIN partido p
-    ON p.id_partido = pp.id_partido
-   AND p.estado_partido = 'FINALIZADO'
- WHERE e.anio = 2026
- GROUP BY e.anio, s.id_seleccion, s.pais
-HAVING SUM(CASE WHEN pp.condicion = 'LOCAL' THEN 1 ELSE 0 END) = COUNT(*)
-    OR SUM(CASE WHEN pp.condicion = 'LOCAL' THEN 1 ELSE 0 END) = 0
- ORDER BY s.pais;
+-- ==============================================================================
+-- Consulta 11 <Selecciones sobre el promedio de diferencia de gol>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 11. Selecciones por encima del promedio de diferencia de gol.
-------------------------------------------------------------------------
+WITH diferencia_por_seleccion AS (
+    SELECT S.id_seleccion,
+           S.pais,
+           SUM(
+             CASE WHEN PP.condicion = 'local'
+                  THEN PP.goles_marcados
+                  ELSE 0 END
+           )
+           + SUM(
+             CASE WHEN PP.condicion = 'visitante'
+                  THEN PP.goles_marcados
+                  ELSE 0 END
+           )
+           - SUM(
+             CASE WHEN PP.condicion = 'local'
+                  THEN (
+                    SELECT MAX(PPV.goles_marcados)
+                    FROM MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PPV
+                    WHERE PPV.id_partido = PP.id_partido
+                      AND PPV.condicion = 'visitante'
+                  )
+                  ELSE (
+                    SELECT MAX(PPL.goles_marcados)
+                    FROM MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PPL
+                    WHERE PPL.id_partido = PP.id_partido
+                      AND PPL.condicion = 'local'
+                  )
+             END
+           ) AS diferencia_gol
+    FROM MORENOLUIS.FIFA_SELECCION S
+    JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PP
+         ON S.id_seleccion = PP.id_seleccion
+    GROUP BY S.id_seleccion, S.pais
+),
+promedio_global AS (
+    SELECT AVG(diferencia_gol) AS promedio
+    FROM diferencia_por_seleccion
+)
+SELECT d.pais, d.diferencia_gol
+FROM diferencia_por_seleccion d, promedio_global pg
+WHERE d.diferencia_gol > pg.promedio
+ORDER BY d.diferencia_gol DESC;
 
-SELECT t.anio, t.id_seleccion, t.pais, t.diferencia_goles
-  FROM vw_tabla_posiciones t
- WHERE t.anio = 2026
-   AND t.diferencia_goles > (
-        SELECT AVG(t2.diferencia_goles)
-          FROM vw_tabla_posiciones t2
-         WHERE t2.anio = 2026
-       )
- ORDER BY t.diferencia_goles DESC, t.pais;
+-- ==============================================================================
+-- Consulta 12 <Goles fase de grupos vs fase eliminatoria>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 12. Goles en fase de grupos frente a fase eliminatoria.
-------------------------------------------------------------------------
+SELECT S.PAIS,
+    SUM(CASE WHEN P.FASE = 'Fase de Grupos' THEN PP.GOLES_MARCADOS ELSE 0 END) GOLES_FASE_GRUPOS,
+    SUM(CASE WHEN P.FASE IN ('Semifinal', 'Tercer Puesto', 'Final') THEN PP.GOLES_MARCADOS ELSE 0 END) GOLES_ELIMINATORIA
+FROM MORENOLUIS.FIFA_SELECCION S
+JOIN MORENOLUIS.FIFA_PARTICIPACION_PARTIDO PP
+    ON S.ID_SELECCION = PP.ID_SELECCION
+JOIN MORENOLUIS.FIFA_PARTIDO P
+    ON PP.ID_PARTIDO = P.ID_PARTIDO
+GROUP BY S.PAIS
+ORDER BY S.PAIS;
 
-SELECT e.anio, s.id_seleccion, s.pais,
-       SUM(CASE WHEN p.fase = 'FASE DE GRUPOS' THEN pp.goles_marcados ELSE 0 END) AS goles_fase_grupos,
-       SUM(CASE WHEN p.fase <> 'FASE DE GRUPOS' THEN pp.goles_marcados ELSE 0 END) AS goles_fase_eliminatoria
-  FROM seleccion s
-  JOIN edicion_mundial e
-    ON e.id_edicion = s.id_edicion
-  JOIN participacion_partido pp
-    ON pp.id_seleccion = s.id_seleccion
-  JOIN partido p
-    ON p.id_partido = pp.id_partido
- WHERE e.anio = 2026
-   AND p.estado_partido = 'FINALIZADO'
- GROUP BY e.anio, s.id_seleccion, s.pais
- ORDER BY s.pais;
+-- ==============================================================================
+-- Consulta 13 <Estadios con mas de una fase distinta>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 13. Estadios con partidos en mas de una fase.
-------------------------------------------------------------------------
+SELECT E.NOMBRE, COUNT(DISTINCT P.FASE) N_FASES_DISTINTAS,
+    CASE WHEN SUM(CASE WHEN P.FASE = 'Fase de Grupos' THEN 1 ELSE 0 END) > 0 THEN 'Fase de Grupos' ELSE '' END ||
+    CASE WHEN SUM(CASE WHEN P.FASE = 'Semifinal' THEN 1 ELSE 0 END) > 0 THEN ', Semifinal' ELSE '' END ||
+    CASE WHEN SUM(CASE WHEN P.FASE = 'Tercer Puesto' THEN 1 ELSE 0 END) > 0 THEN ', Tercer Puesto' ELSE '' END ||
+    CASE WHEN SUM(CASE WHEN P.FASE = 'Final' THEN 1 ELSE 0 END) > 0 THEN ', Final' ELSE '' END FASES
+FROM MORENOLUIS.FIFA_ESTADIO E
+JOIN MORENOLUIS.FIFA_PARTIDO P
+    ON E.ID_ESTADIO = P.ID_ESTADIO
+GROUP BY E.NOMBRE, E.ID_ESTADIO
+HAVING COUNT(DISTINCT P.FASE) > 1;
 
-SELECT e.anio, es.id_estadio, es.nombre AS estadio,
-       COUNT(DISTINCT p.fase) AS fases_distintas
-  FROM edicion_mundial e
-  JOIN estadio es
-    ON es.id_edicion = e.id_edicion
-  JOIN partido p
-    ON p.id_estadio = es.id_estadio
- WHERE e.anio = 2026
- GROUP BY e.anio, es.id_estadio, es.nombre
-HAVING COUNT(DISTINCT p.fase) > 1
- ORDER BY fases_distintas DESC, estadio;
+-- ==============================================================================
+-- Consulta 14 <Verificacion de participaciones duplicadas>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 14. Verificacion de participaciones duplicadas.
-------------------------------------------------------------------------
+SELECT id_partido,
+       id_seleccion,
+       COUNT(*) AS cantidad_participaciones
+FROM MORENOLUIS.FIFA_PARTICIPACION_PARTIDO
+GROUP BY id_partido, id_seleccion
+HAVING COUNT(*) > 1;
 
-SELECT id_partido, id_seleccion, COUNT(*) AS cantidad
-  FROM participacion_partido
- GROUP BY id_partido, id_seleccion
-HAVING COUNT(*) > 1
- ORDER BY id_partido, id_seleccion;
+-- ==============================================================================
+-- Consulta 15 <Fase con mayor cantidad de partidos, usando una vista>
+-- ==============================================================================
 
-------------------------------------------------------------------------
--- 15. Seleccion lider de cada edicion por puntos.
-------------------------------------------------------------------------
-
-SELECT v.anio, v.id_seleccion, v.pais, v.puntos, v.victorias, v.empates,
-       v.derrotas, v.goles_favor, v.goles_contra, v.diferencia_goles
-  FROM vw_tabla_posiciones v
- WHERE v.puntos = (
-        SELECT MAX(v2.puntos)
-          FROM vw_tabla_posiciones v2
-         WHERE v2.anio = v.anio
-       )
- ORDER BY v.anio, v.diferencia_goles DESC, v.goles_favor DESC, v.pais;
+SELECT fase,
+       cantidad_partidos
+FROM v_partidos_por_fase
+WHERE cantidad_partidos = (
+    SELECT MAX(cantidad_partidos)
+    FROM v_partidos_por_fase
+);
