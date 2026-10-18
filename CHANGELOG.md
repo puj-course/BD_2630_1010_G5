@@ -216,3 +216,5 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 
 ### Problemas encontrados
 -Por registrar.
+
+## Semana 10 (30 de septiembre) — Justificación de 1FN, 2FN y 3FN (Entrega 3)
