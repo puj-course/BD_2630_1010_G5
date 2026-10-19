@@ -1,163 +1,402 @@
--- Entrega 2 - Ocho consultas
+-- ===============================================================
+--  ENTREGA 2 - CONSULTAS AVANZADAS
+--  Sistema de Informacion para la Gestion Integral de la Copa Mundial de la FIFA
+-- ===============================================================
 
-SET DEFINE OFF;
 
-------------------------------------------------------------------------
--- Consulta 1. Top 5 goleadores de 2026.
-------------------------------------------------------------------------
+-- 1. Ranking de goleadores por edicion
+-- Jugadores cuyos goles superan el promedio de goles de todos los jugadores registrados.
 
-SELECT anio, id_jugador, jugador, pais,
-       partidos_jugados AS partidos, goles, asistencias
-  FROM vw_e2_rendimiento_jugador
- WHERE anio = 2026
- ORDER BY goles DESC, asistencias DESC, jugador
- FETCH FIRST 5 ROWS ONLY;
+WITH goles_jugador AS (
+    SELECT
+        t.anio,
+        i.id_persona,
+        i.nombre_completo,
+        SUM(r.goles) AS total_goles,
+        COUNT(DISTINCT e.id_partido) AS partidos_jugados
+    FROM RENDIMIENTO_JUGADOR r
+    JOIN INTEGRANTE i
+        ON i.id_persona = r.id_persona
+    JOIN ENCUENTRO e
+        ON e.id_partido = r.id_partido
+    JOIN FASE_TORNEO f
+        ON f.id_etapa = e.id_etapa
+    JOIN TORNEO_MUNDIAL t
+        ON t.id_edicion = f.id_edicion
+    GROUP BY
+        t.anio,
+        i.id_persona,
+        i.nombre_completo
+)
+SELECT
+    anio,
+    nombre_completo AS jugador,
+    total_goles,
+    partidos_jugados
+FROM goles_jugador
+WHERE total_goles > (
+    SELECT AVG(total_goles)
+    FROM goles_jugador
+)
+ORDER BY anio, total_goles DESC, jugador;
 
-------------------------------------------------------------------------
--- Consulta 2. Partido(s) con mayor asistencia por fase.
-------------------------------------------------------------------------
 
-SELECT e.anio, f.codigo AS fase, p.id_partido,
-       es.nombre AS estadio, p.asistencia_registrada
-  FROM partido p
-  JOIN edicion_mundial e
-    ON e.id_edicion = p.id_edicion
-  JOIN partido_fase_e2 pf
-    ON pf.id_partido = p.id_partido
-  JOIN fase_e2 f
-    ON f.id_fase = pf.id_fase
-  JOIN estadio es
-    ON es.id_estadio = p.id_estadio
- WHERE p.asistencia_registrada = (
-        SELECT MAX(p2.asistencia_registrada)
-          FROM partido p2
-          JOIN partido_fase_e2 pf2
-            ON pf2.id_partido = p2.id_partido
-         WHERE p2.id_edicion = p.id_edicion
-           AND pf2.id_fase = pf.id_fase
-       )
- ORDER BY e.anio, f.orden_fase, p.id_partido;
+-- 2. Rendimiento de las selecciones por grupo
+-- Compara goles a favor, goles en contra y diferencia de gol.
 
-------------------------------------------------------------------------
--- Consulta 3. Rendimiento por grupo en 2026 .
-------------------------------------------------------------------------
+WITH goles_por_equipo AS (
+    SELECT
+        pe.id_partido,
+        pe.id_seleccion,
+        pe.goles AS goles_favor,
+        rival.goles AS goles_contra
+    FROM PARTICIPANTE_ENCUENTRO pe
+    JOIN PARTICIPANTE_ENCUENTRO rival
+        ON rival.id_partido = pe.id_partido
+        AND rival.id_seleccion <> pe.id_seleccion
+)
+SELECT
+    t.anio,
+    g.nombre AS grupo,
+    ef.pais AS seleccion,
+    en.codigo_fifa,
+    SUM(gpe.goles_favor) AS goles_favor,
+    SUM(gpe.goles_contra) AS goles_contra,
+    SUM(gpe.goles_favor) - SUM(gpe.goles_contra) AS diferencia_gol
+FROM goles_por_equipo gpe
+JOIN EQUIPO_NACIONAL en
+    ON en.id_seleccion = gpe.id_seleccion
+JOIN ENTE_FUTBOLISTICO ef
+    ON ef.id_organizacion = en.id_organizacion
+JOIN FASE_TORNEO g
+    ON g.id_etapa = en.id_etapa_grupo
+JOIN TORNEO_MUNDIAL t
+    ON t.id_edicion = g.id_edicion
+GROUP BY
+    t.anio,
+    g.nombre,
+    ef.pais,
+    en.codigo_fifa
+ORDER BY
+    t.anio,
+    g.nombre,
+    diferencia_gol DESC;
 
-SELECT id_edicion, grupo, id_seleccion, pais,
-       partidos, victorias, empates, derrotas, puntos, goles_favor
-  FROM vw_e2_tabla_grupo
- WHERE id_edicion = 1
- ORDER BY grupo, puntos DESC, goles_favor DESC, pais;
 
-------------------------------------------------------------------------
--- Consulta 4. Ediciones con asistencia promedio por encima del promedio
--- general.
-------------------------------------------------------------------------
+-- 3. Asistencia promedio y ocupacion por fase
+-- Compara la asistencia registrada con la capacidad de los recintos.
 
-SELECT e.anio,
-       COUNT(p.id_partido) AS partidos,
-       ROUND(AVG(p.asistencia_registrada), 2) AS asistencia_promedio,
-       MAX(p.asistencia_registrada) AS asistencia_maxima
-  FROM edicion_mundial e
-  JOIN partido p
-    ON p.id_edicion = e.id_edicion
- GROUP BY e.anio
-HAVING AVG(p.asistencia_registrada) > (
-        SELECT AVG(p2.asistencia_registrada)
-          FROM partido p2
-       )
- ORDER BY asistencia_promedio DESC;
+SELECT
+    t.anio,
+    f.nombre AS fase,
+    COUNT(e.id_partido) AS partidos_jugados,
+    ROUND(AVG(e.asistencia_registrada), 2) AS asistencia_promedio,
+    ROUND(
+        AVG(100.0 * e.asistencia_registrada / NULLIF(rd.capacidad, 0)),
+        2
+    ) AS ocupacion_promedio_porcentaje
+FROM ENCUENTRO e
+JOIN FASE_TORNEO f
+    ON f.id_etapa = e.id_etapa
+JOIN TORNEO_MUNDIAL t
+    ON t.id_edicion = f.id_edicion
+JOIN RECINTO_DEPORTIVO rd
+    ON rd.id_estadio = e.id_estadio
+GROUP BY
+    t.anio,
+    f.nombre
+HAVING COUNT(e.id_partido) > 0
+ORDER BY
+    t.anio,
+    partidos_jugados DESC,
+    f.nombre;
 
-------------------------------------------------------------------------
--- Consulta 5. Jugadores con tarjetas en 2026.
-------------------------------------------------------------------------
 
-SELECT j.id_jugador,
-       j.nombres || ' ' || j.apellidos AS jugador,
-       s.pais,
-       SUM(st.tarjetas_amarillas) AS amarillas,
-       SUM(st.tarjetas_rojas) AS rojas,
-       SUM(st.minutos) AS minutos,
-       (SELECT COUNT(*)
-          FROM evento_partido_e2 ev
-         WHERE ev.id_jugador = j.id_jugador) AS eventos_registrados
-  FROM jugador_e2 j
-  JOIN convocatoria_jugador_e2 cj
-    ON cj.id_jugador = j.id_jugador
-  JOIN convocatoria_e2 c
-    ON c.id_convocatoria = cj.id_convocatoria
-  JOIN seleccion s
-    ON s.id_seleccion = c.id_seleccion
-  JOIN estadistica_jugador_e2 st
-    ON st.id_jugador = j.id_jugador
-   AND st.id_convocatoria = c.id_convocatoria
- WHERE c.id_edicion = 1
- GROUP BY j.id_jugador, j.nombres, j.apellidos, s.pais
-HAVING SUM(st.tarjetas_amarillas) > 0
- ORDER BY amarillas DESC, rojas DESC, jugador;
+-- 4. Jugadores con mas tarjetas por edicion
+-- Top 5 por edicion; DENSE_RANK permite empates en la misma posicion.
 
-------------------------------------------------------------------------
--- Consulta 6. Carga de arbitros centrales.
-------------------------------------------------------------------------
+WITH disciplina AS (
+    SELECT
+        t.id_edicion,
+        t.anio,
+        i.id_persona,
+        i.nombre_completo AS jugador,
+        SUM(r.tarjetas_amarillas) AS tarjetas_amarillas,
+        SUM(r.tarjetas_rojas) AS tarjetas_rojas,
+        SUM(r.tarjetas_amarillas + r.tarjetas_rojas) AS total_tarjetas
+    FROM RENDIMIENTO_JUGADOR r
+    JOIN INTEGRANTE i
+        ON i.id_persona = r.id_persona
+    JOIN ENCUENTRO e
+        ON e.id_partido = r.id_partido
+    JOIN FASE_TORNEO f
+        ON f.id_etapa = e.id_etapa
+    JOIN TORNEO_MUNDIAL t
+        ON t.id_edicion = f.id_edicion
+    GROUP BY
+        t.id_edicion,
+        t.anio,
+        i.id_persona,
+        i.nombre_completo
+),
+ranking AS (
+    SELECT
+        disciplina.*,
+        DENSE_RANK() OVER (
+            PARTITION BY id_edicion
+            ORDER BY total_tarjetas DESC
+        ) AS posicion
+    FROM disciplina
+    WHERE total_tarjetas > 0
+)
+SELECT
+    anio,
+    posicion,
+    jugador,
+    tarjetas_amarillas,
+    tarjetas_rojas,
+    total_tarjetas
+FROM ranking
+WHERE posicion <= 5
+ORDER BY anio, posicion, jugador;
 
-SELECT a.id_arbitro,
-       a.nombres || ' ' || a.apellidos AS arbitro,
-       COUNT(DISTINCT aa.id_partido) AS partidos_asignados,
-       ROUND(AVG(aa.calificacion), 2) AS calificacion_promedio
-  FROM arbitro_e2 a
-  JOIN asignacion_arbitral_e2 aa
-    ON aa.id_arbitro = a.id_arbitro
- WHERE aa.id_rol = 1
- GROUP BY a.id_arbitro, a.nombres, a.apellidos
-HAVING COUNT(DISTINCT aa.id_partido) >= 2
- ORDER BY partidos_asignados DESC, calificacion_promedio DESC;
 
-------------------------------------------------------------------------
--- Consulta 7. Fases con mas incidencias que el promedio por fase.
-------------------------------------------------------------------------
+-- 5. Carga de trabajo de los arbitros por edicion
+-- Arbitros con al menos 2 partidos, separando los que fueron central o VAR.
 
-SELECT f.codigo AS fase,
-       COUNT(DISTINCT p.id_partido) AS partidos,
-       COUNT(i.id_incidencia) AS incidencias
-  FROM fase_e2 f
-  JOIN partido_fase_e2 pf
-    ON pf.id_fase = f.id_fase
-  JOIN partido p
-    ON p.id_partido = pf.id_partido
-  LEFT JOIN incidencia_e2 i
-    ON i.id_partido = p.id_partido
- GROUP BY f.codigo
-HAVING COUNT(i.id_incidencia) > (
-        SELECT AVG(cantidad)
-          FROM (
-                SELECT COUNT(i2.id_incidencia) AS cantidad
-                  FROM fase_e2 f2
-                  JOIN partido_fase_e2 pf2
-                    ON pf2.id_fase = f2.id_fase
-                  JOIN partido p2
-                    ON p2.id_partido = pf2.id_partido
-                  LEFT JOIN incidencia_e2 i2
-                    ON i2.id_partido = p2.id_partido
-                 GROUP BY f2.codigo
-               )
-       )
- ORDER BY incidencias DESC, fase;
+SELECT
+    t.anio,
+    i.id_persona,
+    i.nombre_completo AS arbitro,
+    COUNT(DISTINCT e.id_partido) AS partidos_asignados,
+    SUM(CASE WHEN ta.rol_arbitral = 'CENTRAL' THEN 1 ELSE 0 END) AS asignaciones_central,
+    SUM(CASE WHEN ta.rol_arbitral = 'VAR' THEN 1 ELSE 0 END) AS asignaciones_var
+FROM TERNA_ARBITRAL ta
+JOIN INTEGRANTE i
+    ON i.id_persona = ta.id_persona
+JOIN ENCUENTRO e
+    ON e.id_partido = ta.id_partido
+JOIN FASE_TORNEO f
+    ON f.id_etapa = e.id_etapa
+JOIN TORNEO_MUNDIAL t
+    ON t.id_edicion = f.id_edicion
+GROUP BY
+    t.anio,
+    i.id_persona,
+    i.nombre_completo
+HAVING COUNT(DISTINCT e.id_partido) >= 2
+ORDER BY
+    t.anio,
+    partidos_asignados DESC,
+    arbitro;
 
-------------------------------------------------------------------------
--- Consulta 8. Jugadores que marcaron en mas de una fase.
-------------------------------------------------------------------------
 
-SELECT j.id_jugador,
-       j.nombres || ' ' || j.apellidos AS jugador,
-       COUNT(DISTINCT f.codigo) AS fases_con_gol,
-       SUM(st.goles) AS goles_totales
-  FROM estadistica_jugador_e2 st
-  JOIN jugador_e2 j
-    ON j.id_jugador = st.id_jugador
-  JOIN partido_fase_e2 pf
-    ON pf.id_partido = st.id_partido
-  JOIN fase_e2 f
-    ON f.id_fase = pf.id_fase
- WHERE st.goles > 0
- GROUP BY j.id_jugador, j.nombres, j.apellidos
-HAVING COUNT(DISTINCT f.codigo) > 1
- ORDER BY goles_totales DESC, jugador;
+-- 6. Cantidad de convocados y capitanes por seleccion
+
+SELECT
+    t.anio,
+    ef.pais AS seleccion,
+    en.codigo_fifa,
+    COUNT(pl.id_vinculacion) AS jugadores_convocados,
+    SUM(CASE WHEN pl.capitan = 'S' THEN 1 ELSE 0 END) AS cantidad_capitanes
+FROM EQUIPO_NACIONAL en
+JOIN ENTE_FUTBOLISTICO ef
+    ON ef.id_organizacion = en.id_organizacion
+JOIN FASE_TORNEO g
+    ON g.id_etapa = en.id_etapa_grupo
+JOIN TORNEO_MUNDIAL t
+    ON t.id_edicion = g.id_edicion
+LEFT JOIN PLANTEL_EQUIPO pl
+    ON pl.id_seleccion = en.id_seleccion
+    AND pl.rol = 'JUGADOR'
+GROUP BY
+    t.anio,
+    en.id_seleccion,
+    ef.pais,
+    en.codigo_fifa
+HAVING COUNT(pl.id_vinculacion) > 0
+ORDER BY
+    t.anio,
+    jugadores_convocados DESC,
+    ef.pais;
+
+
+-- 7. Analisis de novedades por tipo y edicion
+-- Con pocos datos de prueba no se filtra por un minimo de novedades.
+
+SELECT
+    t.anio,
+    n.tipo,
+    COUNT(n.id_incidencia) AS cantidad_novedades,
+    ROUND(AVG(n.minuto), 2) AS minuto_promedio,
+    MIN(n.minuto) AS primer_minuto,
+    MAX(n.minuto) AS ultimo_minuto
+FROM NOVEDAD_ENCUENTRO n
+JOIN ENCUENTRO e
+    ON e.id_partido = n.id_partido
+JOIN FASE_TORNEO f
+    ON f.id_etapa = e.id_etapa
+JOIN TORNEO_MUNDIAL t
+    ON t.id_edicion = f.id_edicion
+GROUP BY
+    t.anio,
+    n.tipo
+HAVING COUNT(n.id_incidencia) >= 1
+ORDER BY
+    t.anio,
+    cantidad_novedades DESC,
+    n.tipo;
+
+
+-- 8. Partidos con muchos goles o grandes diferencias
+-- Umbrales ajustados a los datos de prueba: 3 goles o mas, o diferencia de 2 o mas.
+
+WITH marcador AS (
+    SELECT
+        e.id_partido,
+        t.anio,
+        f.nombre AS fase,
+        MAX(CASE WHEN pe.condicion = 'LOCAL' THEN ef.pais END) AS seleccion_local,
+        MAX(CASE WHEN pe.condicion = 'LOCAL' THEN pe.goles END) AS goles_local,
+        MAX(CASE WHEN pe.condicion = 'VISITANTE' THEN ef.pais END) AS seleccion_visitante,
+        MAX(CASE WHEN pe.condicion = 'VISITANTE' THEN pe.goles END) AS goles_visitante
+    FROM ENCUENTRO e
+    JOIN FASE_TORNEO f
+        ON f.id_etapa = e.id_etapa
+    JOIN TORNEO_MUNDIAL t
+        ON t.id_edicion = f.id_edicion
+    JOIN PARTICIPANTE_ENCUENTRO pe
+        ON pe.id_partido = e.id_partido
+    JOIN EQUIPO_NACIONAL en
+        ON en.id_seleccion = pe.id_seleccion
+    JOIN ENTE_FUTBOLISTICO ef
+        ON ef.id_organizacion = en.id_organizacion
+    GROUP BY
+        e.id_partido,
+        t.anio,
+        f.nombre
+)
+SELECT
+    anio,
+    id_partido,
+    fase,
+    seleccion_local,
+    goles_local,
+    seleccion_visitante,
+    goles_visitante,
+    goles_local + goles_visitante AS goles_totales,
+    ABS(goles_local - goles_visitante) AS diferencia_goles
+FROM marcador
+WHERE goles_local IS NOT NULL
+  AND goles_visitante IS NOT NULL
+  AND (
+      goles_local + goles_visitante >= 3
+      OR ABS(goles_local - goles_visitante) >= 2
+  )
+ORDER BY
+    anio,
+    goles_totales DESC,
+    diferencia_goles DESC;
+
+
+-- 9. Selecciones con mejor rendimiento por edicion
+-- Equipos cuya diferencia de gol supera el promedio de su edicion.
+
+WITH rendimiento AS (
+    SELECT
+        t.id_edicion,
+        t.anio,
+        g.nombre AS grupo,
+        en.id_seleccion,
+        ef.pais AS seleccion,
+        SUM(pe.goles) AS goles_favor,
+        SUM(rival.goles) AS goles_contra,
+        SUM(pe.goles) - SUM(rival.goles) AS diferencia_gol
+    FROM PARTICIPANTE_ENCUENTRO pe
+    JOIN PARTICIPANTE_ENCUENTRO rival
+        ON rival.id_partido = pe.id_partido
+        AND rival.id_seleccion <> pe.id_seleccion
+    JOIN EQUIPO_NACIONAL en
+        ON en.id_seleccion = pe.id_seleccion
+    JOIN ENTE_FUTBOLISTICO ef
+        ON ef.id_organizacion = en.id_organizacion
+    JOIN FASE_TORNEO g
+        ON g.id_etapa = en.id_etapa_grupo
+    JOIN TORNEO_MUNDIAL t
+        ON t.id_edicion = g.id_edicion
+    GROUP BY
+        t.id_edicion,
+        t.anio,
+        g.nombre,
+        en.id_seleccion,
+        ef.pais
+)
+SELECT
+    anio,
+    grupo,
+    seleccion,
+    goles_favor,
+    goles_contra,
+    diferencia_gol
+FROM rendimiento r
+WHERE diferencia_gol > (
+    SELECT AVG(r2.diferencia_gol)
+    FROM rendimiento r2
+    WHERE r2.id_edicion = r.id_edicion
+)
+ORDER BY
+    anio,
+    grupo,
+    diferencia_gol DESC;
+
+
+-- 10. Recintos con ocupacion superior al promedio por edicion
+
+WITH ocupacion AS (
+    SELECT
+        t.id_edicion,
+        t.anio,
+        f.nombre AS fase,
+        rd.id_estadio,
+        rd.nombre AS estadio,
+        rd.capacidad,
+        COUNT(e.id_partido) AS partidos_jugados,
+        ROUND(AVG(e.asistencia_registrada), 2) AS asistencia_promedio,
+        ROUND(
+            AVG(100.0 * e.asistencia_registrada / NULLIF(rd.capacidad, 0)),
+            2
+        ) AS ocupacion_promedio
+    FROM ENCUENTRO e
+    JOIN FASE_TORNEO f
+        ON f.id_etapa = e.id_etapa
+    JOIN TORNEO_MUNDIAL t
+        ON t.id_edicion = f.id_edicion
+    JOIN RECINTO_DEPORTIVO rd
+        ON rd.id_estadio = e.id_estadio
+    WHERE e.asistencia_registrada IS NOT NULL
+    GROUP BY
+        t.id_edicion,
+        t.anio,
+        f.nombre,
+        rd.id_estadio,
+        rd.nombre,
+        rd.capacidad
+)
+SELECT
+    anio,
+    fase,
+    estadio,
+    capacidad,
+    partidos_jugados,
+    asistencia_promedio,
+    ocupacion_promedio
+FROM ocupacion o
+WHERE ocupacion_promedio > (
+    SELECT AVG(o2.ocupacion_promedio)
+    FROM ocupacion o2
+    WHERE o2.id_edicion = o.id_edicion
+)
+ORDER BY
+    anio,
+    fase,
+    ocupacion_promedio DESC;
