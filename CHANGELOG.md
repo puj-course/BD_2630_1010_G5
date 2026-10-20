@@ -217,6 +217,7 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 ### Problemas encontrados
 -El error al leer una tabla sin ningún privilegio puede ser ORA-00942 o ORA-01031 según el servidor.
 -No le pude otorgar a nadie los privilegios, ya que estoy solo
+
 ---
 
 ## Semana 10 (12 Octubre - 18 Octubre) — Justificación de 1FN, 2FN y 3FN (Entrega 2)
