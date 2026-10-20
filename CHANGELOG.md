@@ -8,8 +8,6 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 | Nombre        | GitHub / Perfil |
 |--------------|-----------------|
 | Andrés Gómez | github.com/andrs-gmzz |
-| Estudiante 2 | github.com/usuario2 |
-| Estudiante 3 | github.com/usuario3 |
 
 ---
 ## Registro del proyecto
@@ -174,7 +172,7 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 
 ---
 
-## Semana 8 (30 de septiembre) — Expansión del modelo y consultas avanzadas (Entrega 2)
+## Semana 8 (30 de septiembre - 4 Octubre) — Expansión del modelo y consultas avanzadas (Entrega 2)
 
 ### Objetivos de la semana
 
@@ -185,19 +183,20 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 
 | Tarea | Responsable(s) | Rama utilizada | Descripción |
 |------|------|------|------|
-|Actualizar el modelo lógico y avanzar al físico |Andrés Gómez |feature/consultas-avanzadas |Normalización hasta 3FN (8.2.2) |
-|Consultas de análisis deportivo y operativo |Andrés Gómez |feature/consultas-avanzadas |6 a 10 consultas con JOIN múltiples, subconsultas, CTE (si el motor lo permite) y agregaciones por nivel: Jugador → Partido → Selección → Grupo/Fase → Edición (8.2.1) |
+|Actualizar el modelo lógico y avanzar al físico |Andrés Gómez |feature/consultas-avanzadas |Modelo de 18 tablas en Oracle 19c (ddl_mundial_v3.sql), con 28 FK, 22 CHECK y 10 UNIQUE. Documentos modelo_logico_ampliado.md, modelo_fisico_ampliado.md y diccionario_datos_v3.md |
+|Consultas de análisis deportivo y operativo |Andrés Gómez |feature/consultas-avanzadas |10 consultas con JOIN múltiples, subconsultas, CTE y agregaciones por nivel: Jugador → Partido → Selección → Grupo/Fase → Edición (8.2.1). consultas_avanzadas_mundial.sql |
 
 
 ### Cambios principales
--Ampliación del modelo en curso.
+-Modelo ampliado de 18 tablas y 10 consultas avanzadas publicadas.
 
 ### Problemas encontrados
 -No hubo retroalimentación de la Entrega 1, por lo que no hay ajustes derivados de ella.
+-EQUIPO_NACIONAL no tiene columna de nombre: se resolvió usando ENTE_FUTBOLISTICO (país) y codigo_fifa en las consultas.
 
 ---
 
-## Semana 9 (30 de septiembre) — Roles diferenciados y pruebas (Entrega 2)
+## Semana 9 (5 Octubre - 11 Octubre) — Roles diferenciados y pruebas (Entrega 2)
 
 ### Objetivos de la semana
 
@@ -207,14 +206,39 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 
 | Tarea | Responsable(s) | Rama utilizada | Descripción |
 |------|------|------|------|
-|Roles con privilegios diferenciados |Andrés Gómez |feature/roles-privilegios-2 |Administrador del Torneo, Analista Deportivo y Auditor/Consulta (8.2.3) |
-|Casos de prueba exitosos y fallidos |Andrés Gómez |feature/roles-privilegios-2 |Escenarios válidos y violaciones de reglas, con resultados documentados (8.2.4) |
+|Roles con privilegios diferenciados |Andrés Gómez |feature/roles-privilegios-2 |Administrador del Torneo (rol_gestor_torneo), Analista Deportivo (rol_analista_deportivo) y Auditor/Consulta (rol_auditor_torneo), sin DELETE ni DDL (8.2.3). roles_privilegios_mundial.sql y definicion_roles_privilegios.md |
+|Casos de prueba exitosos y fallidos |Andrés Gómez |feature/roles-privilegios-2 |17 casos exitosos (E01–E17) y 43 fallidos (F01–F43) con resultado esperado vs. obtenido (8.2.4). pruebas_mundial.sql y casos_de_prueba.md |
+|Pruebas de privilegios por rol |Andrés Gómez |feature/roles-privilegios-2 |23 pruebas (8 gestor, 8 analista, 7 auditor) con GRANT, SET ROLE y REVOKE. pruebas_privilegios.sql y pruebas_privilegios.md |
 
 
 ### Cambios principales
--Pendiente.
+-Roles, casos de prueba y pruebas de privilegios publicados.
 
 ### Problemas encontrados
--Por registrar.
+-El error al leer una tabla sin ningún privilegio puede ser ORA-00942 o ORA-01031 según el servidor.
+-No le pude otorgar a nadie los privilegios, ya que estoy solo
+---
 
-## Semana 10 (30 de septiembre) — Justificación de 1FN, 2FN y 3FN (Entrega 3)
+## Semana 10 (12 Octubre - 18 Octubre) — Justificación de 1FN, 2FN y 3FN (Entrega 2)
+
+### Objetivos de la semana
+
+-Justificar que el modelo cumple 1FN, 2FN y 3FN.
+-Cargar un conjunto de datos de prueba reducido (unas 120 filas) coherente con el modelo.
+-Preparar la documentación para la sustentación.
+
+### Tareas realizadas
+
+| Tarea | Responsable(s) | Rama utilizada | Descripción |
+|------|------|------|------|
+|Justificación de normalización |Andrés Gómez |feature/normalizacion |1FN, 2FN y 3FN de las 18 tablas, con 3 redundancias controladas documentadas. normalizacion_modelo.md |
+|Carga de datos de prueba |Andrés Gómez |feature/normalizacion |119 INSERT coherentes entre torneo, sedes, equipos, partidos, árbitros, boletos y bitácora. dml_mundial_v3.sql |
+|Consultas adicionales |Andrés Gómez |feature/normalizacion |8 consultas adaptadas de la entrega anterior. consultas_entrega2_mundial.sql |
+|Guía de sustentación |Andrés Gómez |feature/normalizacion |Documento que explica el proyecto sin tecnicismos. guia_sustentacion.md |
+
+
+### Cambios principales
+-Normalización, datos de prueba y guía de sustentación publicados.
+
+### Problemas encontrados
+-La consulta 4 del segundo archivo devuelve 0 filas porque solo la edición 2026 tiene partidos cargados.
