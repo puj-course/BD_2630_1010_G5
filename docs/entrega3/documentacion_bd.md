@@ -1,4 +1,4 @@
-# documentacion_programacion_bd
+# Documentacion Bd
 
 Proyecto: Sistema de Información para la Gestión Integral de la Copa Mundial de la FIFA · Oracle 19c · Schema `IS101005`
 
