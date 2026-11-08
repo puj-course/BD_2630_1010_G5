@@ -94,43 +94,6 @@ EXCEPTION
 END sp_registrar_resultado;
 /
 
--- un partido nuevo (50) entre las selecciones 1 y 2, sin marcador
-INSERT INTO encuentro (id_partido, id_etapa, id_estadio, id_partido_origen_1, id_partido_origen_2, fecha_hora, asistencia_registrada, estado)
-VALUES (50, 5, 2, NULL, NULL, TO_DATE('2026-07-30 20:00', 'YYYY-MM-DD HH24:MI'), 0, 'PROGRAMADO');
-INSERT INTO participante_encuentro (id_participacion_partido, id_partido, id_seleccion, condicion, goles, goles_penales)
-VALUES (50, 50, 1, 'LOCAL', 0, 0);
-INSERT INTO participante_encuentro (id_participacion_partido, id_partido, id_seleccion, condicion, goles, goles_penales)
-VALUES (51, 50, 2, 'VISITANTE', 0, 0);
-
--- el local gana 3-1  [DEBE FUNCIONAR]
-BEGIN
-    sp_registrar_resultado(50, 3, 1);
-END;
-/
-
-SELECT e.estado, pe.condicion, pe.goles, pe.goles_penales, pe.resultado
-FROM encuentro e
-JOIN participante_encuentro pe ON pe.id_partido = e.id_partido
-WHERE e.id_partido = 50;
-
--- cerrar de nuevo el mismo partido  [DEBE FALLAR]
-BEGIN
-    sp_registrar_resultado(50, 2, 2);
-END;
-/
-
--- partido que no existe  [DEBE FALLAR]
-BEGIN
-    sp_registrar_resultado(9999, 1, 0);
-END;
-/
-
--- goles negativos  [DEBE FALLAR]
-BEGIN
-    sp_registrar_resultado(1, -1, 0);
-END;
-/
-
 -- 2. Convocar un jugador a una seleccion
 
 CREATE OR REPLACE PROCEDURE sp_convocar_jugador (
@@ -182,30 +145,3 @@ EXCEPTION
 END sp_convocar_jugador;
 /
 
--- convocar a la persona 2001 a la seleccion 1 con el dorsal 11  [DEBE FUNCIONAR]
-BEGIN
-    sp_convocar_jugador(1, 2001, 11, 'DELANTERO');
-END;
-/
-
-SELECT id_vinculacion, id_persona, id_seleccion, dorsal, rol
-FROM plantel_equipo
-WHERE id_seleccion = 1;
-
--- Prueba de error: dorsal 11 ya ocupado en la seleccion 1  [DEBE FALLAR]
-BEGIN
-    sp_convocar_jugador(1, 2002, 11, 'DEFENSA');
-END;
-/
-
---seleccion que no existe  [DEBE FALLAR]
-BEGIN
-    sp_convocar_jugador(9999, 2002, 15);
-END;
-/
-
--- la misma persona dos veces en la misma seleccion  [DEBE FALLAR]
-BEGIN
-    sp_convocar_jugador(1, 2001, 12);
-END;
-/
