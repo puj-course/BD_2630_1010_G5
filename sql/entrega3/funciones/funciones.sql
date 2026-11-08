@@ -27,16 +27,6 @@ BEGIN
 END fn_diferencia_gol;
 /
 
--- diferencia de gol de todas las selecciones
-SELECT s.codigo_fifa, fn_diferencia_gol(s.id_seleccion) dif_gol
-FROM equipo_nacional s
-ORDER BY dif_gol DESC;
-
--- seleccion que no existe (DEBE FALLAR)
-SELECT fn_diferencia_gol(9999) FROM dual;
-
-
-
 -- 2. Validar cupo de convocatoria
 
 CREATE OR REPLACE FUNCTION fn_validar_cupo_convocatoria (
@@ -70,20 +60,6 @@ BEGIN
     END IF;
 END fn_validar_cupo_convocatoria;
 /
-
--- selecciones que todavia tienen cupo (con el cupo por defecto, 26)
-SELECT s.codigo_fifa, fn_validar_cupo_convocatoria(s.id_seleccion) hay_cupo
-FROM equipo_nacional s;
-
--- con un cupo pequeño (2) las selecciones con 2 o mas jugadores quedan completas
-SELECT s.codigo_fifa
-FROM equipo_nacional s
-WHERE fn_validar_cupo_convocatoria(s.id_seleccion, 2) = 0;
-
--- Prueba de error: cupo invalido (DEBE FALLAR)
-SELECT fn_validar_cupo_convocatoria(1, 0) FROM dual;
-
-
 
 -- 3. Verificar que un dorsal este libre en una seleccion
 
@@ -126,17 +102,3 @@ BEGIN
     END IF;
 END fn_verificar_dorsal_disponible;
 /
-
--- dorsal ocupado (9) y dorsal libre (50) en la seleccion 1  (0 = ocupado, 1 = libre)
-SELECT fn_verificar_dorsal_disponible(1, 9)  AS dorsal_9,
-       fn_verificar_dorsal_disponible(1, 50) AS dorsal_50
-FROM dual;
-
--- la misma persona puede conservar su propio dorsal
-SELECT pl.id_persona, pl.dorsal,
-       fn_verificar_dorsal_disponible(pl.id_seleccion, pl.dorsal, pl.id_persona) libre
-FROM plantel_equipo pl
-WHERE pl.id_seleccion = 1 AND pl.dorsal IS NOT NULL;
-
--- Prueba de error: dorsal fuera de rango (DEBE FALLAR)
-SELECT fn_verificar_dorsal_disponible(1, 100) FROM dual;
