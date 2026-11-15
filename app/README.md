@@ -1,6 +1,6 @@
 # Mundial App - Entrega 3
 
-Aplicacion de escritorio (Java Swing + JDBC) para el Sistema de Informacion de la Copa Mundial de la FIFA.
+Aplicacion (Java Swing + JDBC) para el Sistema de Informacion de la Copa Mundial de la FIFA.
 Se conecta a la base de datos Oracle de las entregas anteriores (18 tablas).
 
 ## Como ejecutarla
@@ -43,30 +43,3 @@ Se conecta a la base de datos Oracle de las entregas anteriores (18 tablas).
 | Consultas | Rendimiento de selecciones | Usa `fn_diferencia_gol` y `fn_validar_cupo_convocatoria` |
 | Consultas | Bitacora de cambios | BITACORA_CAMBIOS |
 | Reportes | Panel de reportes | Las 10 consultas avanzadas |
-
-## Como se conecta con lo que ya hicimos
-
-- **Funciones:** la consulta "Rendimiento de selecciones" las usa dentro del SELECT.
-- **Procedimientos:** "Convocar jugador" llama a `sp_convocar_jugador` y "Registrar resultado" a `sp_registrar_resultado`.
-  Los procedimientos no hacen COMMIT: la aplicacion confirma (`commit`) si todo salio bien y deshace (`rollback`) si falla.
-- **Triggers:** se prueban desde la aplicacion. Programar un partido en un estadio ocupado muestra el mensaje de
-  `trg_cruce_agenda_estadio`; convocar con un dorsal repetido, el de `trg_dorsal_unico`; llenar una convocatoria, el de `trg_cupo_convocatoria`.
-- **Restricciones:** un dorsal de 100, minutos de 130 o una fecha de fin anterior a la de inicio muestran el mensaje de Oracle del `CHECK` correspondiente.
-- **Roles:** cada usuario trabaja con sus propios privilegios. Conectarse con un usuario que solo tenga `rol_auditor_torneo`
-  y crear un registro muestra el error de privilegios insuficientes; con `rol_analista_deportivo`, solo se puede modificar
-  sucesos, estadisticas e incidencias.
-
-## Como probar rapido
-
-1. Consultas > Tabla de posiciones: debe mostrar COL con 6 puntos.
-2. Partidos > Registro de partidos > Programar partido: mismo estadio y 1 hora despues del partido 1 -> rechazado por el trigger.
-3. Catalogos > Jugadores y cuerpo tecnico > Convocar jugador con dorsal 9 en la seleccion 1 -> rechazado (dorsal ocupado).
-4. Catalogos > Ediciones > Eliminar la edicion 1 -> rechazado (tiene datos relacionados).
-5. Reportes > elegir una consulta > Ejecutar.
-
-## Notas de diseno
-
-- Las pantallas de tablas usan un CRUD generico (`PanelCrud` + `RepositorioTabla`) descrito en `Catalogos`, en vez de una clase y un repositorio por entidad. Asi las 14 tablas comparten el mismo codigo.
-- Los ids se calculan como `MAX + 1`, porque el modelo no usa secuencias.
-- Las fechas se escriben como `aaaa-mm-dd` y las fechas con hora como `aaaa-mm-dd hh:mm`.
-- Los errores de Oracle se muestran tal cual (por ejemplo `ORA-20015: La convocatoria ya esta completa`).
