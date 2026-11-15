@@ -243,3 +243,53 @@ Registro del progreso semanal del proyecto, las tareas realizadas, los responsab
 
 ### Problemas encontrados
 -La consulta 4 del segundo archivo devuelve 0 filas porque solo la edición 2026 tiene partidos cargados.
+
+## Semana 11 (26 Octubre - 30 Octubre) — Programación en base de datos (Entrega 3)
+ 
+### Objetivos de la semana
+ 
+-Implementar funciones, procedimientos almacenados y triggers sobre el modelo de 18 tablas.
+-Documentar su propósito, parámetros y comportamiento esperado.
+ 
+### Tareas realizadas
+ 
+| Tarea | Responsable(s) | Rama utilizada | Descripción |
+|------|------|------|------|
+|Funciones PL/SQL |Andrés Gómez |feature/programacion-bd |fn_diferencia_gol, fn_validar_cupo_convocatoria y fn_verificar_dorsal_disponible, con consultas de prueba. sql/funciones_mundial.sql |
+|Procedimientos almacenados |Andrés Gómez |feature/programacion-bd |sp_registrar_resultado (cierra un partido y calcula GANO/PERDIO/EMPATO) y sp_convocar_jugador (valida cupo y dorsal con las funciones). sql/procedimientos_mundial.sql |
+|Triggers |Andrés Gómez |feature/programacion-bd |trg_cupo_convocatoria, trg_dorsal_unico y trg_cruce_agenda_estadio (los dos últimos compuestos). sql/triggers_mundial.sql |
+|Documentación de programación |Andrés Gómez |feature/programacion-bd |Propósito, parámetros y comportamiento esperado de cada componente. docs/documentacion_programacion_bd.md |
+ 
+ 
+### Cambios principales
+-Funciones, procedimientos y triggers publicados con sus pruebas dentro de cada archivo.
+ 
+### Problemas encontrados
+-El servidor no permite COMMIT dentro de los procedimientos ni EXEC: los procedimientos usan solo ROLLBACK en el bloque EXCEPTION y las pruebas son bloques BEGIN ... END;.
+-Los triggers de dorsal y de agenda consultan la tabla que modifican: se implementaron como triggers compuestos para evitar el error de tabla mutante.
+-Componentes de la rúbrica de la Entrega 3 que aún no están implementados: función de ranking de goleadores; procedimientos de carga masiva de resultados, actualización de la tabla de posiciones y cierre de fase; triggers de auditoría, validación de rangos, anti-duplicidad y consistencia del marcador.
+ 
+---
+ 
+## Semana 12 (2 Noviembre - 13 Noviembre) — Aplicación de escritorio (Entrega 3)
+ 
+### Objetivos de la semana
+ 
+-Construir la aplicación que administra los catálogos, registra partidos y estadísticas y consulta la información del torneo.
+-Completar README.md y CHANGELOG.md con el avance real.
+ 
+### Tareas realizadas
+ 
+| Tarea | Responsable(s) | Rama utilizada | Descripción |
+|------|------|------|------|
+|Aplicación de escritorio (Java Swing + JDBC) |Andrés Gómez |feature/aplicacion |Proyecto Maven mundial-app/: catálogos de 14 tablas con crear, modificar y eliminar; programar partidos y registrar resultados con sp_registrar_resultado; convocar jugadores con sp_convocar_jugador; consultas de posiciones, resultados, incidencias y rendimiento de selecciones; bitácora |
+|Panel de reportes |Andrés Gómez |feature/aplicacion |Ejecuta las 10 consultas avanzadas de la Entrega 2 desde mundial-app/src/main/resources/reportes.sql |
+|README.md y CHANGELOG.md |Andrés Gómez |feature/aplicacion |README.md con estructura del repositorio, orden de ejecución, instrucciones de la aplicación y estado del avance; CHANGELOG.md con los nombres exactos de los archivos entregados |
+ 
+ 
+### Cambios principales
+-Aplicación publicada en mundial-app/ con config.properties.
+ 
+### Problemas encontrados
+-El panel de reportes ejecuta las consultas sin filtros por selección, grupo o fase.
+-La aplicación y los scripts se verificaron con la lógica equivalente en SQLite; falta la ejecución completa en Oracle y las capturas como evidencia.
