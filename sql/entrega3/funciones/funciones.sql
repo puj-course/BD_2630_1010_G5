@@ -1,104 +1,63 @@
--- 1. Diferencia de gol de una seleccion
-
-CREATE OR REPLACE FUNCTION fn_diferencia_gol (
-    p_id_seleccion IN NUMBER
-) RETURN NUMBER IS
+-- 1. diferencia de goles es igual a goles a favor - goles en contra
+CREATE OR REPLACE FUNCTION fn_diferencia_gol(p_id_seleccion IN NUMBER)
+RETURN NUMBER IS
     v_existe NUMBER;
-    v_dif    NUMBER;
+    v_diferencia NUMBER;
 BEGIN
     SELECT COUNT(*) INTO v_existe
-    FROM equipo_nacional
-    WHERE id_seleccion = p_id_seleccion;
-
-    IF v_existe = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001, 'La selección no existe');
+    FROM EQUIPO_NACIONAL WHERE id_seleccion=p_id_seleccion;
+    IF v_existe=0 THEN
+        RAISE_APPLICATION_ERROR(-20001,'La seleccion no existe');
     END IF;
 
-    SELECT NVL(SUM(pe.goles - rival.goles), 0)
-    INTO v_dif
-    FROM participante_encuentro pe
-    JOIN participante_encuentro rival ON rival.id_partido = pe.id_partido
-                                     AND rival.id_seleccion <> pe.id_seleccion
-    JOIN encuentro e ON e.id_partido = pe.id_partido
-    WHERE pe.id_seleccion = p_id_seleccion
-      AND e.estado = 'FINALIZADO';
-
-    RETURN v_dif;
+    SELECT NVL(SUM(p.goles-rival.goles),0) INTO v_diferencia
+    FROM PARTICIPANTE_ENCUENTRO p
+    JOIN PARTICIPANTE_ENCUENTRO rival ON rival.id_partido=p.id_partido
+                                      AND rival.id_seleccion<>p.id_seleccion
+    JOIN ENCUENTRO e ON e.id_partido=p.id_partido
+    WHERE p.id_seleccion=p_id_seleccion AND e.estado='FINALIZADO';
+    RETURN v_diferencia;
 END fn_diferencia_gol;
 /
 
--- 2. Validar cupo de convocatoria
-
-CREATE OR REPLACE FUNCTION fn_validar_cupo_convocatoria (
-    p_id_seleccion IN NUMBER,
-    p_cupo_maximo  IN NUMBER DEFAULT 26
-) RETURN NUMBER IS
-    v_existe     NUMBER;
-    v_convocados NUMBER;
+-- 2. devuelve 1 si hay cupo para otro jugador, 0 si se lleno el plantel
+CREATE OR REPLACE FUNCTION fn_validar_cupo_convocatoria(p_id_seleccion IN NUMBER)
+RETURN NUMBER IS
+    v_existe NUMBER;
+    v_jugadores NUMBER;
 BEGIN
-    IF p_cupo_maximo IS NULL OR p_cupo_maximo < 1 THEN
-        RAISE_APPLICATION_ERROR(-20003, 'El cupo máximo debe ser mayor que cero');
-    END IF;
-
     SELECT COUNT(*) INTO v_existe
-    FROM equipo_nacional
-    WHERE id_seleccion = p_id_seleccion;
-
-    IF v_existe = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'La selección no existe');
+    FROM EQUIPO_NACIONAL WHERE id_seleccion=p_id_seleccion;
+    IF v_existe=0 THEN
+        RAISE_APPLICATION_ERROR(-20002,'La seleccion no existe');
     END IF;
 
-    SELECT COUNT(*) INTO v_convocados
-    FROM plantel_equipo
-    WHERE id_seleccion = p_id_seleccion
-      AND rol = 'JUGADOR';
-
-    IF v_convocados < p_cupo_maximo THEN
-        RETURN 1;
-    ELSE
-        RETURN 0;
-    END IF;
+    SELECT COUNT(*) INTO v_jugadores FROM PLANTEL_EQUIPO
+    WHERE id_seleccion=p_id_seleccion AND rol='JUGADOR';
+    IF v_jugadores<26 THEN RETURN 1; END IF;
+    RETURN 0;
 END fn_validar_cupo_convocatoria;
 /
 
--- 3. Verificar que un dorsal este libre en una seleccion
-
-CREATE OR REPLACE FUNCTION fn_verificar_dorsal_disponible (
-    p_id_seleccion IN NUMBER,
-    p_dorsal       IN NUMBER,
-    p_id_persona   IN NUMBER DEFAULT NULL
-) RETURN NUMBER IS
-    v_existe  NUMBER;
-    v_ocupado NUMBER;
+-- 3. posicion de una persona en goleadores de una edicion y se valida de forma que 1 significa primer lugar. Si no tiene goles/estadisticas, devuelve 0
+CREATE OR REPLACE FUNCTION fn_ranking_goleadores(
+    p_id_edicion IN NUMBER, p_id_persona IN NUMBER)
+RETURN NUMBER IS
+    v_posicion NUMBER;
 BEGIN
-    -- el cuerpo tecnico no usa dorsal
-    IF p_dorsal IS NULL THEN
-        RETURN 1;
-    END IF;
-
-    IF p_dorsal < 1 OR p_dorsal > 99 THEN
-        RAISE_APPLICATION_ERROR(-20005, 'El dorsal debe estar entre 1 y 99');
-    END IF;
-
-    SELECT COUNT(*) INTO v_existe
-    FROM equipo_nacional
-    WHERE id_seleccion = p_id_seleccion;
-
-    IF v_existe = 0 THEN
-        RAISE_APPLICATION_ERROR(-20004, 'La selección no existe');
-    END IF;
-
-    --sSe ignora la fila de la misma persona, para poder actualizar su propio dorsal
-    SELECT COUNT(*) INTO v_ocupado
-    FROM plantel_equipo
-    WHERE id_seleccion = p_id_seleccion
-      AND dorsal = p_dorsal
-      AND (p_id_persona IS NULL OR id_persona <> p_id_persona);
-
-    IF v_ocupado = 0 THEN
-        RETURN 1;
-    ELSE
-        RETURN 0;
-    END IF;
-END fn_verificar_dorsal_disponible;
+    SELECT NVL(MAX(posicion),0) INTO v_posicion
+    FROM (
+        SELECT id_persona, DENSE_RANK() OVER (ORDER BY total_goles DESC) posicion
+        FROM (
+            SELECT r.id_persona,SUM(r.goles) total_goles
+            FROM RENDIMIENTO_JUGADOR r
+            JOIN ENCUENTRO e ON e.id_partido=r.id_partido
+            JOIN FASE_TORNEO f ON f.id_etapa=e.id_etapa
+            WHERE f.id_edicion=p_id_edicion AND e.estado='FINALIZADO'
+            GROUP BY r.id_persona
+            HAVING SUM(r.goles)>0
+        )
+    ) WHERE id_persona=p_id_persona;
+    RETURN v_posicion;
+END fn_ranking_goleadores;
 /
