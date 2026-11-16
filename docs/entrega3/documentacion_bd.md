@@ -1,223 +1,74 @@
-# Documentacion Bd
+# Documentación BD — Entrega 3 
 
-Proyecto: Sistema de Información para la Gestión Integral de la Copa Mundial de la FIFA · Oracle 19c · Schema `IS101005`
+**Contenido:** 3 funciones, 2 procedimientos y 4 triggers.
 
-Este documento describe el propósito, los parámetros y el comportamiento esperado de las funciones, procedimientos y triggers que implementan la lógica de negocio del Mundial. Se limitó a lo esencial: cada pieza resuelve una regla concreta y usa solo las 18 tablas del modelo.
+## 1. Modelo y cambios de integridad
 
-| Tipo | Cantidad | Qué resuelven |
+Se conservan las **18 tablas** del DDL.
+
+**Convocatorias por edición:** cada registro de selección se asocia a un grupo y a una edición. `PLANTEL_EQUIPO` permite conservar el historial de una persona en diferentes ediciones. `trg_cupo_convocatoria` evita que una misma persona sea jugadora de dos selecciones en una misma edición y controla el cupo máximo de 26. En la aplicación existe una consulta del historial por jugador.
+
+**Posiciones:** se calculan con una consulta `SELECT` directamente sobre los encuentros `FINALIZADO` de fase de grupos. No se guardan en una tabla adicional, evitando duplicar información. G = 3 puntos, E = 1 punto, P = 0 puntos. Se suman partidos jugados, victorias, empates, derrotas, goles a favor y en contra.
+
+## 2. Funciones (`funciones.sql`)
+
+| Función | Parámetros | Devuelve | Justificación |
+|---|---|---|---|
+| `fn_diferencia_gol` | `p_id_seleccion NUMBER` | Goles a favor menos goles en contra en encuentros finalizados | Consultar una métrica deportiva sin repetir la agregación |
+| `fn_validar_cupo_convocatoria` | `p_id_seleccion NUMBER` | 1 si hay menos de 26 jugadores; 0 si la selección está llena | Conocer si se puede agregar un jugador; sirve al procedimiento de convocatoria |
+| `fn_ranking_goleadores` | `p_id_edicion NUMBER`, `p_id_persona NUMBER` | Puesto del jugador; 0 cuando no aparece con goles | Consulta el ranking por edición sin usar `SYS_REFCURSOR` |
+
+Para probar las funciones con los IDs del DML original:
+
+```sql
+SELECT fn_diferencia_gol(1) AS dg FROM dual;
+SELECT fn_validar_cupo_convocatoria(1) AS cupo FROM dual;
+SELECT fn_ranking_goleadores(1,1101) AS puesto FROM dual;
+```
+
+El ranking utiliza `SUM` para sumar goles y `DENSE_RANK` para asignar el mismo puesto cuando dos jugadores están empatados.
+
+## 3. Procedimientos (`procedimientos.sql`)
+
+### 3.1 `sp_registrar_resultado`
+
+**Parámetros:** `p_id_partido NUMBER`, `p_goles_local NUMBER`, `p_goles_visitante NUMBER`, `p_penales_local NUMBER DEFAULT 0`, `p_penales_visitante NUMBER DEFAULT 0`.
+
+**Operación:** verifica que el partido exista, que tenga dos filas de participantes y que goles/penales no sean nulos ni negativos. Rechaza cerrar de nuevo un partido `FINALIZADO`. Calcula `GANO`, `PERDIO` o `EMPATO` comparando goles y, si hay empate, penales. Actualiza las dos filas de `PARTICIPANTE_ENCUENTRO` y cambia `ENCUENTRO.estado` a `FINALIZADO`.
+
+**Justificación:** conserva la versión sencilla probada en el esquema del estudiante; centraliza el registro del resultado en una única operación. Su bloque `WHEN OTHERS THEN ROLLBACK; RAISE;` revierte operaciones de la transacción si aparece una excepción. Java también controla la confirmación y reversión de su conexión.
+
+**Integración con trigger:** al finalizar, `trg_auditoria_y_marcador` verifica que los goles oficiales coincidan con los registrados en `RENDIMIENTO_JUGADOR`. Si no coinciden, el procedimiento falla y el partido no se finaliza. Las estadísticas individuales deben registrarse antes de cerrar el partido.
+
+### 3.2 `sp_convocar_jugador`
+
+**Parámetros:** `p_id_seleccion NUMBER`, `p_id_persona NUMBER`, `p_dorsal NUMBER`, `p_posicion VARCHAR2 DEFAULT NULL`, `p_capitan CHAR DEFAULT 'N'`, `p_club VARCHAR2 DEFAULT NULL`.
+
+**Operación:** verifica que existan la selección y la persona; llama a `fn_validar_cupo_convocatoria` para comprobar el máximo de 26 jugadores; comprueba que el dorsal sea entero entre 1 y 99 y que no esté utilizado en esa selección. Genera un ID mediante `seq_plantel.NEXTVAL` e inserta un `JUGADOR` en `PLANTEL_EQUIPO`. El índice único y el trigger vuelven a proteger la integridad ante inserciones concurrentes o por fuera de la aplicación.
+
+**Justificación:** recupera el procedimiento antiguo de convocatoria. Solo se sustituyó la función retirada `fn_verificar_dorsal_disponible` por un `SELECT COUNT(*)` sobre la tabla y se sustituyó el cálculo `MAX(id)+1` por una secuencia para no duplicar IDs. No incluye `MERGE` ni cursores avanzados.
+
+**Uso en la app:** `RepositorioPlantel` llama a este procedimiento para rol `JUGADOR`. Los integrantes del cuerpo técnico se insertan directamente sin dorsal, porque no forman parte del cupo de 26.
+
+## 4. Triggers (`triggers.sql`)
+
+| Trigger | Tabla | Qué valida o registra |
 |---|---|---|
-| Funciones | 3 | Cálculos y validaciones que devuelven un valor |
-| Procedimientos | 2 | Operaciones que modifican datos en varios pasos |
-| Triggers | 3 | Reglas de negocio que se cumplen siempre, sin depender de quien inserte |
+| `trg_auditoria_y_marcador` | `ENCUENTRO` | Audita operaciones y, al finalizar mediante `UPDATE`, verifica que los goles oficiales coincidan con la suma de goles individuales. También bloquea modificaciones de finalizados |
+| `trg_rangos_y_auditoria` | `RENDIMIENTO_JUGADOR` | Rechaza valores negativos y estadísticas de partidos finalizados; comprueba que el jugador corresponda a un participante y audita los cambios |
+| `trg_participacion_valida` | `PARTICIPANTE_ENCUENTRO` | Comprueba que la selección pertenezca a la misma edición del partido y bloquea cambios en participantes finalizados. Las restricciones `UNIQUE` del DDL evitan duplicaciones de selección o condición |
+| `trg_cupo_convocatoria` | `PLANTEL_EQUIPO` | Controla máximo 26, impide pertenecer a dos selecciones en la misma edición y protege historiales con estadísticas |
 
-## Funciones
-## Procedimientos
-## Triggers
+`trg_cupo_convocatoria` es el único **trigger compuesto**. Registra los IDs afectados por cada fila y consulta el plantel después de completar la sentencia; así evita consultar la misma tabla durante un trigger por fila (error de tabla mutante de Oracle).
 
-> Selección = `EQUIPO_NACIONAL` · participación = `PARTICIPANTE_ENCUENTRO` · partido = `ENCUENTRO` · convocatoria = `PLANTEL_EQUIPO`.
-> `EQUIPO_NACIONAL` no tiene nombre: el país está en `ENTE_FUTBOLISTICO.pais`.
-> Cuando una validación falla, la función, procedimiento o trigger detiene la operación y muestra un mensaje de error propio que explica el motivo.
+La auditoría se registra en `BITACORA_CAMBIOS`, una tabla que ya existía en el DDL . Sus filas pertenecen a la misma transacción: si se deshace una operación, también se deshace su registro de auditoría.
 
----
+## 5. Aplicación Java y reportes
 
-# Funciones
+- `RepositorioPartido`: programa partidos en una fecha/estadio coherentes y llama a `sp_registrar_resultado` para guardar el marcador. **No tiene carga masiva**.
+- `RepositorioPlantel`: usa `sp_convocar_jugador` para jugadores y `INSERT` normal para cuerpo técnico.
+- `Consultas.POSICIONES` y `ReportesConsultas.POSICIONES_SQL`: calculan en vivo la tabla de posiciones mediante un `SELECT` y agregaciones sobre `ENCUENTRO` y `PARTICIPANTE_ENCUENTRO`. Por eso **no requieren `POSICION_GRUPO` ni procedimiento de actualización**.
+- `PanelReportes`: filtros por edición, selección, grupo y fase para goleadores, posiciones, incidencias y rendimiento.
+- Las consultas usan `PreparedStatement` y parámetros `?`. La aplicación confirma operaciones cuando terminan correctamente.
 
-## 1. `fn_diferencia_gol`
-
-### Propósito
-Calcular la diferencia de gol de una selección: goles a favor menos goles en contra, considerando todos sus partidos finalizados.
-
-### Parámetros / entradas
-
-| Parámetro | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `p_id_seleccion` | `NUMBER` | Sí | Identificador de la selección (`equipo_nacional.id_seleccion`). |
-
-**Retorno:** `NUMBER`. Diferencia de gol (puede ser negativa).
-
-### Comportamiento esperado
-
-- Para cada partido de la selección busca la fila rival en `participante_encuentro` (mismo `id_partido`, distinta selección) y suma `goles propios - goles del rival`.
-- Solo cuenta partidos con `encuentro.estado = 'FINALIZADO'`.
-- No cuenta los goles de la tanda de penales (`goles_penales`).
-- Si la selección existe pero no ha jugado, devuelve `0`.
-- Si la selección no existe, muestra el mensaje 'La selección no existe'.
-
-**Ejemplo:** `SELECT fn_diferencia_gol(1) FROM dual;`
-
----
-
-## 2. `fn_validar_cupo_convocatoria`
-
-### Propósito
-Verificar si a una selección todavía se le puede agregar un jugador sin superar el cupo máximo de convocatoria.
-
-### Parámetros / entradas
-
-| Parámetro | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `p_id_seleccion` | `NUMBER` | Sí | Selección a validar. |
-| `p_cupo_maximo` | `NUMBER` | No (default `26`) | Máximo de jugadores permitidos. |
-
-**Retorno:** `NUMBER`. `1` si aún hay cupo, `0` si la convocatoria está completa. Se usa `NUMBER` y no `BOOLEAN` para poder llamarla también desde SQL.
-
-### Comportamiento esperado
-
-- Cuenta en `plantel_equipo` los registros de esa selección con `rol = 'JUGADOR'`. El cuerpo técnico no consume cupo.
-- Devuelve `1` si `convocados < p_cupo_maximo` y `0` en caso contrario.
-- Si la selección no existe, muestra 'La selección no existe'. Si el cupo máximo es nulo o menor que 1, muestra 'El cupo máximo debe ser mayor que cero'.
-- La usan `sp_convocar_jugador` y el trigger `trg_cupo_convocatoria`.
-
-**Ejemplo:** `SELECT fn_validar_cupo_convocatoria(1) FROM dual;`
-
----
-
-## 3. `fn_verificar_dorsal_disponible`
-
-### Propósito
-Verificar si un número de camiseta está libre dentro de una selección.
-
-### Parámetros / entradas
-
-| Parámetro | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `p_id_seleccion` | `NUMBER` | Sí | Selección donde se quiere usar el dorsal. |
-| `p_dorsal` | `NUMBER` | Sí | Número de camiseta a verificar. |
-| `p_id_persona` | `NUMBER` | No | Persona que ya tiene la fila; se ignora al comparar, para poder actualizar su propio dorsal. |
-
-**Retorno:** `NUMBER`. `1` si el dorsal está libre, `0` si otro integrante de la selección ya lo tiene.
-
-### Comportamiento esperado
-
-- Busca en `plantel_equipo` otra fila con la misma selección y el mismo dorsal, distinta de `p_id_persona`.
-- Si no encuentra ninguna, devuelve `1`; si encuentra alguna, `0`.
-- Si `p_dorsal` es nulo, devuelve `1` (el cuerpo técnico no usa dorsal).
-- Si la selección no existe, muestra 'La selección no existe'. Si el dorsal está fuera de 1 a 99, muestra 'El dorsal debe estar entre 1 y 99'.
-- La usan `sp_convocar_jugador` y el trigger `trg_dorsal_unico`.
-
-**Ejemplo:** `SELECT fn_verificar_dorsal_disponible(1, 10) FROM dual;`
-
----
-
-# Procedimientos
-
-## 1. `sp_registrar_resultado`
-
-### Propósito
-Cerrar un partido: guardar el marcador de los dos equipos, calcular el resultado de cada uno y pasar el partido a `FINALIZADO`.
-
-### Parámetros / entradas
-
-| Parámetro | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `p_id_partido` | `NUMBER` | Sí | Partido a cerrar (`encuentro.id_partido`). |
-| `p_goles_local` | `NUMBER` | Sí | Goles del equipo `LOCAL` en el juego. |
-| `p_goles_visitante` | `NUMBER` | Sí | Goles del equipo `VISITANTE` en el juego. |
-| `p_penales_local` | `NUMBER` | No (default `0`) | Goles del local en la tanda de penales. |
-| `p_penales_visitante` | `NUMBER` | No (default `0`) | Goles del visitante en la tanda de penales. |
-
-### Comportamiento esperado
-
-- Actualiza `goles` y `goles_penales` en las dos filas de `participante_encuentro` del partido.
-- Calcula `resultado` de cada equipo (`GANO`, `PERDIO`, `EMPATO`). Si hay empate en el juego y los penales son distintos, gana quien tenga más penales.
-- Cambia `encuentro.estado` a `'FINALIZADO'`.
-- Si el partido no existe, muestra 'El partido no existe'. Si no tiene exactamente un local y un visitante, muestra 'El partido debe tener un local y un visitante'. Si algún gol es nulo o negativo, muestra 'Los goles no pueden ser nulos ni negativos'. Si el partido ya estaba `FINALIZADO`, muestra 'El partido ya está finalizado' para no sobrescribir un resultado cerrado.
-- Aplica `COMMIT` solo si todo salió bien; ante un error hace `ROLLBACK`.
-- Mantiene coherente la columna `participante_encuentro.resultado`, una de las redundancias controladas de la normalización.
-
----
-
-## 2. `sp_convocar_jugador`
-
-### Propósito
-Agregar un jugador a la convocatoria de una selección respetando el cupo y el dorsal único.
-
-### Parámetros / entradas
-
-| Parámetro | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `p_id_seleccion` | `NUMBER` | Sí | Selección que convoca. |
-| `p_id_persona` | `NUMBER` | Sí | Persona a convocar (`integrante.id_persona`). |
-| `p_dorsal` | `NUMBER` | Sí | Número de camiseta (1 a 99). |
-| `p_posicion` | `VARCHAR2` | No | Posición en la cancha. |
-| `p_capitan` | `CHAR` | No (default `'N'`) | `'S'` o `'N'`. |
-| `p_club` | `VARCHAR2` | No | Club de origen. |
-
-### Comportamiento esperado
-
-- Verifica que la selección y la persona existan; si no, muestra 'La selección o la persona no existe'.
-- Llama a `fn_validar_cupo_convocatoria`; si devuelve `0`, muestra 'La convocatoria ya está completa'.
-- Llama a `fn_verificar_dorsal_disponible`; si devuelve `0`, muestra 'El dorsal ya está asignado en esta selección'.
-- Calcula el nuevo `id_vinculacion` como `MAX(id_vinculacion) + 1` (el modelo no usa secuencias).
-- Inserta en `plantel_equipo` con `rol = 'JUGADOR'`.
-- Si la persona ya está en esa selección, lo rechaza la restricción `UNIQUE (id_seleccion, id_persona)`; el procedimiento no la repite.
-
----
-
-# Triggers
-
-## 1. `trg_cupo_convocatoria`
-
-| Atributo | Valor |
-|---|---|
-| Tabla | `plantel_equipo` |
-| Momento | `BEFORE INSERT` (por fila) |
-| Regla de negocio | Cupo de convocatoria |
-
-### Comportamiento esperado
-
-- Solo actúa si la fila nueva tiene `rol = 'JUGADOR'`.
-- Llama a `fn_validar_cupo_convocatoria`. Si devuelve `0`, rechaza el INSERT y muestra 'La convocatoria ya está completa'.
-- Garantiza la regla aunque alguien inserte directamente en la tabla sin usar `sp_convocar_jugador`.
-
----
-
-## 2. `trg_dorsal_unico`
-
-| Atributo | Valor |
-|---|---|
-| Tabla | `plantel_equipo` |
-| Momento | `BEFORE INSERT OR UPDATE OF dorsal, id_seleccion` |
-| Regla de negocio | Dorsal único por selección |
-
-### Comportamiento esperado
-
-- Llama a `fn_verificar_dorsal_disponible` con la selección, el dorsal y la persona de la fila.
-- Si devuelve `0`, rechaza la operación y muestra 'El dorsal ya está asignado en esta selección'.
-- El DDL solo garantiza `UNIQUE (id_seleccion, id_persona)`; la unicidad del dorsal no está en una restricción, por eso se hace con trigger.
-- Como la validación consulta la misma tabla que se está modificando, se implementa como *compound trigger*. Así se evita el problema de la tabla mutante: Oracle no deja leer una tabla mientras un trigger de fila la está cambiando.
-
----
-
-## 3. `trg_cruce_agenda_estadio`
-
-| Atributo | Valor |
-|---|---|
-| Tabla | `encuentro` |
-| Momento | `BEFORE INSERT OR UPDATE OF id_estadio, fecha_hora` |
-| Regla de negocio | Cruce de agenda en estadio |
-
-### Comportamiento esperado
-
-- Revisa si ya existe otro partido en el mismo `id_estadio` con `fecha_hora` a menos de 3 horas del partido nuevo.
-- Si existe, rechaza la operación y muestra 'El estadio ya tiene un partido en ese horario'.
-- Ignora el propio partido cuando es un UPDATE.
-- Se implementa como *compound trigger* por la misma razón que el anterior.
-- La ventana de 3 horas es un supuesto de diseño y queda documentada para poder ajustarla.
-
----
-
-| Tipo | Nombre | Regla / uso | Qué se evita |
-|---|---|---|---|
-| Función | `fn_diferencia_gol` | Diferencia de gol de una selección | Consultar una selección inexistente |
-| Función | `fn_validar_cupo_convocatoria` | Cupo de 26 jugadores | Superar el cupo; cupo inválido |
-| Función | `fn_verificar_dorsal_disponible` | Dorsal libre en la selección | Dorsal repetido o fuera de rango |
-| Procedimiento | `sp_registrar_resultado` | Cerrar partido y calcular resultados | Marcadores inválidos; cerrar dos veces un partido |
-| Procedimiento | `sp_convocar_jugador` | Convocar con cupo y dorsal válidos | Convocatoria llena; dorsal repetido |
-| Trigger | `trg_cupo_convocatoria` | Cupo de convocatoria | Insertar jugadores de más |
-| Trigger | `trg_dorsal_unico` | Dorsal único por selección | Dos jugadores con el mismo número |
-| Trigger | `trg_cruce_agenda_estadio` | Sin cruce de horario en estadio | Dos partidos a la vez en un estadio |
-
----
-
-Las validaciones de rangos (goles ≥ 0, dorsal de 1 a 99) y de duplicados (selección repetida en un partido) no necesitan trigger, porque ya las cubren `CHECK` y `UNIQUE` en el DDL.
+La entrega individual **no automatiza carga masiva, avance de clasificados ni un procedimiento de posiciones**. La rúbrica escrita menciona varios como ejemplos esperados, de modo que el docente decidirá cómo valorar ese alcance reducido según sus comentarios. Los reportes sí cubren posiciones en tiempo de consulta y las reglas de integridad centrales siguen en la base.
