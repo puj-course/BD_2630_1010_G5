@@ -1,5 +1,3 @@
--- ENTREGA 3 INDIVIDUAL - SOLO 3 FUNCIONES
-
 -- 1. diferencia de goles es igual a goles a favor - goles en contra
 CREATE OR REPLACE FUNCTION fn_diferencia_gol(p_id_seleccion IN NUMBER)
 RETURN NUMBER IS
