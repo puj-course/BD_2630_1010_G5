@@ -2,10 +2,7 @@
 
 **Sistema de Información para la Gestión Integral de la Copa Mundial de la FIFA**  
 **Asignatura:** Bases de Datos  
-**Modalidad:** Entrega 3 — proyecto individual  
-**Motor:** Oracle Database 19c  
-**Esquema evaluado:** `IS101005`  
-**Fecha del informe:** 16 de noviembre de 2026
+**Modalidad:** Entrega 3
 
 ---
 
@@ -212,8 +209,3 @@ Las pruebas proporcionan **evidencia positiva** para las tres funciones calculad
 Por otro lado, el procedimiento `SP_REGISTRAR_RESULTADO` y los triggers de auditoría señalados por Oracle presentaron errores de validez que impidieron ejecutar correctamente parte de los escenarios. Estos errores condicionaron las pruebas posteriores, en particular la creación de un partido temporal, el registro de estadísticas y la verificación de consistencia entre goles individuales y marcador oficial.
 
 En consecuencia, **la ejecución documentada no constituye una aprobación completa de la lógica de programación de la Entrega 3**. Su resultado es **parcial**: determinados cálculos y la convocatoria válida quedaron demostrados, mientras que el registro de resultados y las auditorías no superaron los ensayos, y otras validaciones permanecieron sin evidencia suficiente para emitir un juicio concluyente.
-
----
-
-**Fuente de evidencia:** archivo `Prompt resultados.pdf`, páginas 1 a 7, que contiene las salidas de SQL Developer identificadas como Prompt 1 a Prompt 12.  
-**Carácter del informe:** registro final de los resultados efectivamente aportados; no incluye resultados simulados ni pruebas atribuidas como exitosas sin evidencia explícita.
