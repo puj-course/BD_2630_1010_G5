@@ -70,5 +70,3 @@ La auditoría se registra en `BITACORA_CAMBIOS`, una tabla que ya existía en el
 - `Consultas.POSICIONES` y `ReportesConsultas.POSICIONES_SQL`: calculan en vivo la tabla de posiciones mediante un `SELECT` y agregaciones sobre `ENCUENTRO` y `PARTICIPANTE_ENCUENTRO`. Por eso **no requieren `POSICION_GRUPO` ni procedimiento de actualización**.
 - `PanelReportes`: filtros por edición, selección, grupo y fase para goleadores, posiciones, incidencias y rendimiento.
 - Las consultas usan `PreparedStatement` y parámetros `?`. La aplicación confirma operaciones cuando terminan correctamente.
-
-La entrega individual **no automatiza carga masiva, avance de clasificados ni un procedimiento de posiciones**. La rúbrica escrita menciona varios como ejemplos esperados, de modo que el docente decidirá cómo valorar ese alcance reducido según sus comentarios. Los reportes sí cubren posiciones en tiempo de consulta y las reglas de integridad centrales siguen en la base.
